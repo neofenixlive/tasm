@@ -1,0 +1,51 @@
+---<TinyAssembly>---
+6502 assembly sub-set written in C89
+
+---<Syntax>---
+"OPERATION OPERAND"
+
+'#' Literal operand
+'$' Hexadecimal operand
+'%' Binary operand
+';' Comment, ignores anything after
+
+No labels, all branches and jumps
+perform on line-based positions
+
+---<Instruction set>---
+NOP Does nothing
+LDA Loads value into A
+LDX Loads value into X
+LDY Loads value into Y
+STA Stores A into address
+STX Stores X into address
+STY Stores Y into address
+TAX Transfers A to X
+TAY Transfers A to Y
+TSX Transfers SP to A
+TXA Transfers X to A
+TYA Transfers Y to A
+PHA Push A to stack
+PLA Pull A from stack
+CLC Clear C flag
+CLV Set C flag
+DEC Decrement address
+DEX Decrement X
+DEY Decrement Y
+INC Increment address
+INX Increment X
+INY Increment Y
+ADC Add to A with Carry
+SBC Subtract from A with Carry
+ROL Rotate A to left
+ROR Rotate A to right
+CMP Compare A to value 
+CPX Compare X to value
+CPY Compare Y to value
+BEQ Branch to value if equal
+BNE Branch to value if not equal
+BMI Branch to value if minus
+BPL Branch to value if plus
+JMP Jump to line
+JSR Jump to subroutine at line
+RTS Return from subroutine
