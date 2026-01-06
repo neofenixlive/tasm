@@ -104,8 +104,8 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     Idx = 3;
     if(Line[Idx] == '#') { T[2] = IMM; Idx++; }
     else { T[2] = ABS; }
-    if(Line[Idx] == '&') { IsHex = 1; }
-    else if(Line[Idx] == '%') { IsBin = 1; }
+    if(Line[Idx] == '$') { IsHex = 1; Idx++; }
+    else if(Line[Idx] == '%') { IsBin = 1; Idx++; }
     
     while(Line[Idx] != '\0') {
         if(IsHex) {
@@ -127,7 +127,7 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
         }
         Idx++;
     }
-    TASM_OverflowMem(T[1]);
+    if(T[2] == IMM) { TASM_OverflowMem(T[1]); }
     
     free(Line);
     return T;
@@ -156,8 +156,8 @@ void TASM_Eval(struct TASM_Machine* M) {
         case TXA: M->A = M->X; break;
         case TYA: M->A = M->Y; break;
         case TXS: M->SP = M->X; break;
-        case PHA: M->RAM[0x0100 + M->SP] = M->A; M->SP--; break;
-        case PLA: M->SP++; M->A = M->RAM[0x0100 + M->SP]; M->RAM[0x0100 + M->SP] = 0; break;
+        case PHA: M->RAM[0x100 + M->SP] = M->A; M->SP--; break;
+        case PLA: M->SP++; M->A = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
         case CLC: M->C = 0; break;
         case CLV: M->V = 0; break;
         case DEC: (*Data)--; TASM_SetZN(M, *Data); break;
@@ -224,14 +224,15 @@ void TASM_Eval(struct TASM_Machine* M) {
         case BMI: if(M->N) {M->PC = *Data-2;} break;
         case BPL: if(!M->N) {M->PC = *Data-2;} break;
         case JMP: M->PC = *Data-2; break;
-        case JSR: M->RAM[0x0100 + M->SP] = M->PC; M->SP--; M->PC = *Data-2; break;
-        case RTS: M->SP++; M->PC = M->RAM[0x0100 + M->SP]; M->RAM[0x0100 + M->SP] = 0; break;
+        case JSR: M->RAM[0x100 + M->SP] = M->PC; M->SP--; M->PC = *Data-2; break;
+        case RTS: M->SP++; M->PC = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
     }
     
     TASM_OverflowMem(M->X);
     TASM_OverflowMem(M->Y);
     TASM_OverflowMem(M->A);
-    if(M->ROM[M->PC][2] == ABS) { TASM_OverflowMem(*Data); }
+    TASM_OverflowMem(M->SP);
+    if(M->ROM[M->PC][2] == IMM) { TASM_OverflowMem(*Data); }
     M->PC++;
 }
 
@@ -251,7 +252,7 @@ void* TASM_Start(char* F) {
     M->X = 0;
     M->Y = 0;
     M->PC = 0;
-    M->SP = 0x00FF;
+    M->SP = 0xFF;
     M->Z = 0;
     M->N = 0;
     M->C = 0;
@@ -273,18 +274,20 @@ void* TASM_Start(char* F) {
 /* runs a machine */
 void TASM_Execute(struct TASM_Machine* M) {
     int Idx;
+    int SubIdx;
     clock_t Start;
     
 	while(M->ROM[M->PC+1] != NULL) {
 		TASM_Eval(M);
+        
 		printf("\033[2J\033[H");
-		printf("--<TinyASM>-------------------\n");
+		printf("--<CPU>----------------------\n");
         printf("A: $%X,  X: $%X,  Y: $%X\n", M->A, M->X, M->Y);
         printf("PC: $%X,  SP: $%X,  (%d, %d)\n", M->PC, M->SP, M->ROM[M->PC][0], M->ROM[M->PC][1]);
-		printf("--<Interpreted>---------------\n");
-		
-		for(Idx = 0; Idx < 0xFF; Idx++) {
-			if(M->RAM[Idx] != 0) { printf("$%X: $%X; ", Idx, M->RAM[Idx]); }
+        
+		printf("--<RAM>----------------------\n");
+		for(Idx = 0; Idx < 0xFFFF; Idx++) {
+			if(M->RAM[Idx] != 0) { printf("$%X: $%X, ", Idx, M->RAM[Idx]); }
 		}
         
         Start = clock();
