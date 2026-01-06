@@ -301,7 +301,7 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
 		}
         
         Start = clock();
-        while(clock() < Start + (CLOCKS_PER_SEC * 0.2)) {}
+        while(clock() < Start + (CLOCKS_PER_SEC * 0.1)) {}
 	}
 }
 
