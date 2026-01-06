@@ -43,7 +43,6 @@ struct TASM_Machine {
 
 /* parses string into token */
 void* TASM_Parser(char* S, struct TASM_Machine* M) {
-    /* All variables declared at the top of the scope */
     int* T = malloc(sizeof(int) * 3);
     int Idx = 0;
     int SubIdx = 0;
@@ -51,10 +50,8 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     int IsBin = 0;
     int SaveAs16 = 0;
     char* Line = NULL;
-    char* TempLine = NULL; /* Temporary pointer for safe realloc */
 
     if (T == NULL) {
-        /* Handle allocation failure gracefully */
         return NULL;
     }
     T[0] = 0;
@@ -67,16 +64,15 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
         }
         if (S[Idx] == ';') { break; }
 
-        /* FIX: Use temporary pointer to catch realloc failure */
-        TempLine = realloc(Line, sizeof(char) * (SubIdx + 2));
-
-        if (TempLine == NULL) {
-            free(Line); /* Free the original block to prevent leak */
-            free(T);    /* Clean up other allocations */
+        /* check for formatted string memory reallocation failure */
+        Line = realloc(Line, sizeof(char) * (SubIdx + 2));
+        if (Line == NULL) {
+            free(Line);
+            free(T);
+            printf("--<String formatting failed!>--\n");
             return NULL;
         }
 
-        Line = TempLine;
         Line[SubIdx] = S[Idx];
         Line[SubIdx + 1] = '\0';
         SubIdx++;
@@ -196,7 +192,7 @@ void TASM_Eval(struct TASM_Machine* M) {
         int Result = M->A + *Data + Carry;
         M->A = Result;
         TASM_SetZN(M, M->A);
-        TASM_SetC(M, M->A, 0x100);
+        TASM_SetC(M, Result, 0x100);
         TASM_SetV(M, M->A, Result, *Data);
         break;
     }
@@ -205,19 +201,19 @@ void TASM_Eval(struct TASM_Machine* M) {
         int Result = M->A + Inverted + Carry;
         M->A = Result;
         TASM_SetZN(M, M->A);
-        TASM_SetC(M, M->A, 0x100);
+        TASM_SetC(M, Result, 0x100);
         TASM_SetV(M, M->A, Result, Inverted);
         break;
     }
     case ROL: {
-        if (M->A & 0x88) { M->P |= C; }
+        if (M->A & 0x80) { M->P |= C; }
         else { M->P &= ~C; }
         M->A = (M->A << 1) | Carry;
         TASM_SetZN(M, M->A);
         break;
     }
     case ROR: {
-        if (M->A & 0x88) { M->P |= C; }
+        if (M->A & 0x1) { M->P |= C; }
         else { M->P &= ~C; }
         M->A = (M->A >> 1) | (Carry << 7);
         TASM_SetZN(M, M->A);
@@ -241,17 +237,17 @@ void TASM_Eval(struct TASM_Machine* M) {
         TASM_SetC(M, M->Y, *Data);
         break;
     }
-    case BEQ: if (M->P & Z) { M->PC = *Data - 1; } break;
-    case BNE: if (!(M->P & Z)) { M->PC = *Data - 1; } break;
-    case BMI: if (M->P & N) { M->PC = *Data - 1; } break;
-    case BPL: if (!(M->P & N)) { M->PC = *Data - 1; } break;
+    case BEQ: if (M->P & Z) { M->PC = *Data - 2; } break;
+    case BNE: if (!(M->P & Z)) { M->PC = *Data - 2; } break;
+    case BMI: if (M->P & N) { M->PC = *Data - 2; } break;
+    case BPL: if (!(M->P & N)) { M->PC = *Data - 2; } break;
     case JMP: M->PC = *Data - 1; break;
     case JSR:
         M->RAM[0x100 + M->SP] = (M->PC >> 8) & 0xFF;
         M->SP--;
         M->RAM[0x100 + M->SP] = M->PC & 0xFF;
         M->SP--;
-        M->PC = *Data - 1;
+        M->PC = *Data - 2;
         break;
     case RTS:
         M->SP++;
@@ -284,19 +280,20 @@ void* TASM_Start(char* F) {
 
     while (fgets(Instruction, 21, Program)) {
         int* T = TASM_Parser(Instruction, M);
-        int** tempROM = realloc(M->ROM, sizeof(int*) * (Idx + 2));
-        if (tempROM == NULL) {
-            /* Handle allocation failure gracefully */
+
+        /* check for ROM memory reallocation failure */
+        M->ROM = realloc(M->ROM, sizeof(int*) * (Idx + 2));
+        if (M->ROM == NULL) {
             free(T);
             free(M->ROM);
             free(Instruction);
             fclose(Program);
             free(M->RAM);
             free(M);
-            printf("--<Memory allocation failed!>--\n");
+            printf("--<Read-only memory failed!>--\n");
             exit(1);
         }
-        M->ROM = tempROM;
+
         M->ROM[Idx] = T;
         M->ROM[Idx + 1] = NULL;
         Idx++;
@@ -313,7 +310,7 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
     int SubIdx;
     clock_t Start;
 
-    while (M->ROM[M->PC + 1] != NULL) {
+    while (M->ROM[M->PC] != NULL) {
         TASM_Eval(M);
 
         printf("\033[2J\033[H");
