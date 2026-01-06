@@ -30,10 +30,10 @@ enum TASM_ADDRESSING {
 };
 
 struct TASM_Machine {
-    int** ROM;                           /* array that represents program, (opcode & memory) */
-    int* RAM;                            /* array that represents memory */ 
-    int A; int X; int Y; int PC; int SP; /* registers: accumulator, x, y, program counter, stack pointer */
-    int Z; int N; int C; int V;          /* flags: zero, negative, carry, OverflowMem */
+    int** ROM; int PC;           /* array that represents program (opcode & memory) */
+    int* RAM; int SP;            /* array that represents memory */ 
+    int A; int X; int Y;         /* registers: accumulator, index x, index y */
+    int C; int Z; int V; int N;  /* flags: carry, zero, overflow, negative */
 };
 
 /* parses string into token */
@@ -219,12 +219,12 @@ void TASM_Eval(struct TASM_Machine* M) {
             TASM_SetC(M, M->Y, *Data);
             break;
         }
-        case BEQ: if(M->Z) {M->PC = *Data-2;} break;
-        case BNE: if(!M->Z) {M->PC = *Data-2;} break;
-        case BMI: if(M->N) {M->PC = *Data-2;} break;
-        case BPL: if(!M->N) {M->PC = *Data-2;} break;
-        case JMP: M->PC = *Data-2; break;
-        case JSR: M->RAM[0x100 + M->SP] = M->PC; M->SP--; M->PC = *Data-2; break;
+        case BEQ: if(M->Z) {M->PC = *Data-1;} break;
+        case BNE: if(!M->Z) {M->PC = *Data-1;} break;
+        case BMI: if(M->N) {M->PC = *Data-1;} break;
+        case BPL: if(!M->N) {M->PC = *Data-1;} break;
+        case JMP: M->PC = *Data-1; break;
+        case JSR: M->RAM[0x100 + M->SP] = M->PC; M->SP--; M->PC = *Data-1; break;
         case RTS: M->SP++; M->PC = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
     }
     
@@ -248,15 +248,15 @@ void* TASM_Start(char* F) {
     
     M->ROM = calloc(1, sizeof(int*));
     M->RAM = calloc(0xFFFF, sizeof(int));
+    M->PC = 0;
+    M->SP = 0xFF;
     M->A = 0;
     M->X = 0;
     M->Y = 0;
-    M->PC = 0;
-    M->SP = 0xFF;
-    M->Z = 0;
-    M->N = 0;
     M->C = 0;
+    M->Z = 0;
     M->V = 0;
+    M->N = 0;
     
     while(fgets(Instruction, 21, Program)) {
         int* T = TASM_Parser(Instruction, M);
@@ -272,7 +272,7 @@ void* TASM_Start(char* F) {
 }
 
 /* runs a machine */
-void TASM_Execute(struct TASM_Machine* M) {
+void TASM_Execute(struct TASM_Machine* M, char* Name) {
     int Idx;
     int SubIdx;
     clock_t Start;
@@ -282,12 +282,14 @@ void TASM_Execute(struct TASM_Machine* M) {
         
 		printf("\033[2J\033[H");
 		printf("--<CPU>----------------------\n");
-        printf("A: $%X,  X: $%X,  Y: $%X\n", M->A, M->X, M->Y);
-        printf("PC: $%X,  SP: $%X,  (%d, %d)\n", M->PC, M->SP, M->ROM[M->PC][0], M->ROM[M->PC][1]);
+        printf("\"%s\"\n", Name);
+        printf("(PC)$%X,  (SP)$%X\n", M->PC, M->SP);
+        printf("(A)$%X,  (X)$%X,  (Y)$%X\n", M->A, M->X, M->Y);
+        printf("(C)%d,  (Z)%d,  (V)%d,  (N)%d\n", M->C, M->Z, M->V, M->N);
         
 		printf("--<RAM>----------------------\n");
 		for(Idx = 0; Idx < 0xFFFF; Idx++) {
-			if(M->RAM[Idx] != 0) { printf("$%X: $%X, ", Idx, M->RAM[Idx]); }
+			if(M->RAM[Idx] != 0) { printf("($%X)$%X ", Idx, M->RAM[Idx]); }
 		}
         
         Start = clock();
@@ -301,7 +303,7 @@ int main(int ArgC, char* ArgV[]) {
     if(!ArgV[1]) { printf("--<File missing!>--\n"); exit(1); }
     
     M = TASM_Start(ArgV[1]);
-    TASM_Execute(M);
+    TASM_Execute(M, ArgV[1]);
     
     for(Idx = 0; M->ROM[Idx+1] != NULL; Idx++) {
     	free(M->ROM[Idx]);
