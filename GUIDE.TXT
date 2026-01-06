@@ -9,8 +9,10 @@
 '%' Binary operand
 ';' Comment, ignores anything after
 
-No labels, all branches and jumps
-perform on line-based positions
+No labels, branches and jumps use line positions
+No overflow, arithmetic functions use 0 to 255
+Every instruction is executed in 1/10 of a second
+Information is displayed into the terminal
 
 ---<Instruction set>---
 NOP Does nothing
@@ -39,8 +41,10 @@ INX Increment X
 INY Increment Y
 ADC Add to A with Carry
 SBC Subtract from A with Carry
-ROL Rotate A to left
-ROR Rotate A to right
+ASL Shift A to left
+LSR Shift A to right
+ROL Rotate A to left with Carry
+ROR Rotate A to right with Carry
 CMP Compare A to value 
 CPX Compare X to value
 CPY Compare Y to value

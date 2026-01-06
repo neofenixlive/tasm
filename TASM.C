@@ -20,7 +20,7 @@ enum TASM_INSTRUCTIONS {
     NOP,
     LDA, LDX, LDY, STA, STX, STY, TAX, TAY, TSX, TXA, TYA, TXS, /* memory */
     PHP, PLP, PHA, PLA, CLC,                                    /* stack and flags */
-    DEC, DEX, DEY, INC, INX, INY, ADC, SBC, ROL, ROR,           /* arithmetic */
+    DEC, DEX, DEY, INC, INX, INY, ADC, SBC, ASL, LSR, ROL, ROR, /* arithmetic */
     CMP, CPX, CPY, BEQ, BNE, BMI, BPL, JMP, JSR, RTS            /* condition and skip*/
 };
 
@@ -100,6 +100,8 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     else if (TASM_CheckOpr(Line, "INY")) { T[0] = INY; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "ADC")) { T[0] = ADC; }
     else if (TASM_CheckOpr(Line, "SBC")) { T[0] = SBC; }
+    else if (TASM_CheckOpr(Line, "ASL")) { T[0] = ASL; T[2] = IMP; }
+    else if (TASM_CheckOpr(Line, "LSR")) { T[0] = LSR; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "ROL")) { T[0] = ROL; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "ROR")) { T[0] = ROR; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "CMP")) { T[0] = CMP; }
@@ -194,6 +196,20 @@ void TASM_Eval(struct TASM_Machine* M) {
         M->A = Result;
         TASM_SetZN(M, M->A);
         TASM_SetC(M, Result, 0x100);
+        break;
+    }
+    case ASL: {
+        if (M->A & 0x80) { M->P |= C; }
+        else { M->P &= ~C; }
+        M->A = (M->A << 1);
+        TASM_SetZN(M, M->A);
+        break;
+    }
+    case LSR: {
+        if (M->A & 0x1) { M->P |= C; }
+        else { M->P &= ~C; }
+        M->A = (M->A >> 1);
+        TASM_SetZN(M, M->A);
         break;
     }
     case ROL: {
@@ -310,7 +326,7 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
         printf("\"%s\"\n", Name);
         printf("(PC)$%X,  (SP)$%X\n", M->PC, M->SP);
         printf("(A)$%X,  (X)$%X,  (Y)$%X\n", M->A, M->X, M->Y);
-        printf("(C)%d (N)%d (Z)%d\n", M->P & C != 0, M->P & N != 0, M->P & Z != 0);
+        printf("(C)%d (V)%d (N)%d (Z)%d\n", M->P & C != 0, M->P & V != 0, M->P & N != 0, M->P & Z != 0);
 
         printf("--<RAM>----------------------\n");
         for (Idx = 0; Idx < 0xFFFF; Idx++) {
