@@ -138,6 +138,7 @@ void TASM_Eval(struct TASM_Machine* M) {
     int Value = 0;
     int Carry = 0;
     int* Data = &Value;
+    if(M->PC < 0 || M->PC > 0xFFFF) { return; }
     if(M->ROM[M->PC][2] == IMM) { *Data = M->ROM[M->PC][1]; }
     if(M->ROM[M->PC][2] == ABS) { Data = &M->RAM[M->ROM[M->PC][1]]; }
     if(M->C) { Carry = 1; }
@@ -224,8 +225,19 @@ void TASM_Eval(struct TASM_Machine* M) {
         case BMI: if(M->N) {M->PC = *Data-1;} break;
         case BPL: if(!M->N) {M->PC = *Data-1;} break;
         case JMP: M->PC = *Data-1; break;
-        case JSR: M->RAM[0x100 + M->SP] = M->PC; M->SP--; M->PC = *Data-1; break;
-        case RTS: M->SP++; M->PC = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
+        case JSR:
+            M->RAM[0x100 + M->SP] = (M->PC >> 8) & 0xFF;
+            M->SP--;
+            M->RAM[0x100 + M->SP] = M->PC & 0xFF;
+            M->SP--;
+            M->PC = *Data-1;
+            break;
+        case RTS:
+            M->SP++;
+            M->PC = M->RAM[0x100 + M->SP];
+            M->SP++;
+            M->PC = (M->PC << 8) | M->RAM[0x100 + M->SP];
+            break;
     }
     
     TASM_OverflowMem(M->X);
