@@ -25,6 +25,8 @@ TAY Transfers A to Y
 TSX Transfers SP to A
 TXA Transfers X to A
 TYA Transfers Y to A
+PHP Push flags to stack
+PLP Pull flags from stack
 PHA Push A to stack
 PLA Pull A from stack
 CLC Clear C flag

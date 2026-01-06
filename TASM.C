@@ -2,22 +2,28 @@
 #include <stdlib.h>
 #include <time.h>
 
+#define C 0x1
+#define V 0x2
+#define Z 0x4
+#define N 0x8
+
 #define TASM_CheckOpr(s1, s2) ((s1)[0]==(s2)[0] && (s1)[1]==(s2)[1] && (s1)[2]==(s2)[2])
-#define TASM_OverflowMem(v) (v) = (v) & 0xFF
-#define TASM_SetZN(m, v) do {          \
-    (v) &= 0xFF;                       \
-    if ((v) == 0) { (m)->Z = 1; }      \
-    else { (m)->Z = 0; }               \
-    if ((v) & 0x80) { (m)->N = 1; }    \
-    else { (m)->N = 0; } } while(0)
-#define TASM_SetC(m, v1, v2) do {      \
-    if((v1) >= (v2)) { (m)->C = 1;}    \
-    else { (m)->C = 0; } } while(0)    \
+#define TASM_SetZN(m, v) do {        \
+    if ((v) == 0) { (m)->P |= Z; }   \
+    else { (m)->P &= ~Z; }    \
+    if ((v) & 0x80) { (m)->P |= N; } \
+    else { (m)->P &= ~N; } } while(0)
+#define TASM_SetC(m, v1, v2) do {    \
+    if((v1) >= (v2)) { (m)->P |= C;} \
+    else { (m)->P &= ~C; } } while(0)
+#define TASM_SetV(m, v1, v2, v3) do {                          \
+    if (((v1) ^ (v2)) & ((v1) ^ (v3)) & 0x80) { (m)->P |= V; } \
+    else { (m)->P &= ~V; }} while(0)
 
 enum TASM_INSTRUCTIONS {
     NOP,
     LDA, LDX, LDY, STA, STX, STY, TAX, TAY, TSX, TXA, TYA, TXS, /* memory */
-    PHA, PLA, CLC, CLV,                                         /* stack and flags */
+    PHP, PLP, PHA, PLA, CLC, CLV,                               /* stack and flags */
     DEC, DEX, DEY, INC, INX, INY, ADC, SBC, ROL, ROR,           /* arithmetic */
     CMP, CPX, CPY, BEQ, BNE, BMI, BPL, JMP, JSR, RTS            /* condition and skip*/
 };
@@ -30,10 +36,9 @@ enum TASM_ADDRESSING {
 };
 
 struct TASM_Machine {
-    int** ROM; int PC;           /* array that represents program (opcode & memory) */
-    int* RAM; int SP;            /* array that represents memory */ 
-    int A; int X; int Y;         /* registers: accumulator, index x, index y */
-    int C; int Z; int V; int N;  /* flags: carry, zero, overflow, negative */
+    unsigned int** ROM; unsigned int PC; /* array that represents program (opcode & memory) */
+    unsigned char* RAM; unsigned char SP;                  /* array that represents memory */ 
+    unsigned char A; unsigned char X; unsigned char Y; unsigned char P;      /* registers and flags */
 };
 
 /* parses string into token */
@@ -43,6 +48,7 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     int SubIdx = 0;
     int IsHex = 0;
     int IsBin = 0;
+    int SaveAs16 = 0;
     char* Line = NULL;
     
     T[0] = 0;
@@ -74,6 +80,8 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     else if(TASM_CheckOpr(Line, "TXA")) { T[0] = TXA; T[2] = IMP; }
     else if(TASM_CheckOpr(Line, "TYA")) { T[0] = TYA; T[2] = IMP; }
     else if(TASM_CheckOpr(Line, "TXS")) { T[0] = TXS; T[2] = IMP; }
+    else if(TASM_CheckOpr(Line, "PHP")) { T[0] = PHP; T[2] = IMP; }
+    else if(TASM_CheckOpr(Line, "PLP")) { T[0] = PLP; T[2] = IMP; }
     else if(TASM_CheckOpr(Line, "PHA")) { T[0] = PHA; T[2] = IMP; }
     else if(TASM_CheckOpr(Line, "PLA")) { T[0] = PLA; T[2] = IMP; }
     else if(TASM_CheckOpr(Line, "CLC")) { T[0] = CLC; T[2] = IMP; }
@@ -91,12 +99,12 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     else if(TASM_CheckOpr(Line, "CMP")) { T[0] = CMP; }
     else if(TASM_CheckOpr(Line, "CPX")) { T[0] = CPX; }
     else if(TASM_CheckOpr(Line, "CPY")) { T[0] = CPY; }
-    else if(TASM_CheckOpr(Line, "BEQ")) { T[0] = BEQ; }
-    else if(TASM_CheckOpr(Line, "BNE")) { T[0] = BNE; }
-    else if(TASM_CheckOpr(Line, "BMI")) { T[0] = BMI; }
-    else if(TASM_CheckOpr(Line, "BPL")) { T[0] = BPL; }
-    else if(TASM_CheckOpr(Line, "JMP")) { T[0] = JMP; }
-    else if(TASM_CheckOpr(Line, "JSR")) { T[0] = JSR; }
+    else if(TASM_CheckOpr(Line, "BEQ")) { T[0] = BEQ; SaveAs16 = 1; }
+    else if(TASM_CheckOpr(Line, "BNE")) { T[0] = BNE; SaveAs16 = 1; }
+    else if(TASM_CheckOpr(Line, "BMI")) { T[0] = BMI; SaveAs16 = 1; }
+    else if(TASM_CheckOpr(Line, "BPL")) { T[0] = BPL; SaveAs16 = 1; }
+    else if(TASM_CheckOpr(Line, "JMP")) { T[0] = JMP; SaveAs16 = 1; }
+    else if(TASM_CheckOpr(Line, "JSR")) { T[0] = JSR; SaveAs16 = 1; }
     else if(TASM_CheckOpr(Line, "RTS")) { T[0] = RTS; T[2] = IMP; }
     
     if(T[2] == IMP) { free(Line); return T; }
@@ -127,7 +135,7 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
         }
         Idx++;
     }
-    if(T[2] == IMM) { TASM_OverflowMem(T[1]); }
+    if(!SaveAs16 && T[2] != ABS) { T[1] &= 0xFF; }
     
     free(Line);
     return T;
@@ -138,10 +146,9 @@ void TASM_Eval(struct TASM_Machine* M) {
     int Value = 0;
     int Carry = 0;
     int* Data = &Value;
-    if(M->PC < 0 || M->PC > 0xFFFF) { return; }
     if(M->ROM[M->PC][2] == IMM) { *Data = M->ROM[M->PC][1]; }
     if(M->ROM[M->PC][2] == ABS) { Data = &M->RAM[M->ROM[M->PC][1]]; }
-    if(M->C) { Carry = 1; }
+    if(M->P & C) { Carry = 1; }
     
     switch(M->ROM[M->PC][0]) {
         default: break;
@@ -159,8 +166,10 @@ void TASM_Eval(struct TASM_Machine* M) {
         case TXS: M->SP = M->X; break;
         case PHA: M->RAM[0x100 + M->SP] = M->A; M->SP--; break;
         case PLA: M->SP++; M->A = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
-        case CLC: M->C = 0; break;
-        case CLV: M->V = 0; break;
+        case PHP: M->RAM[0x100 + M->SP] = M->P; M->SP--; break;
+        case PLP: M->SP++; M->P = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
+        case CLC: M->P &= ~C; break;
+        case CLV: M->P &= ~V; break;
         case DEC: (*Data)--; TASM_SetZN(M, *Data); break;
         case DEX: M->X--; TASM_SetZN(M, M->X); break;
         case DEY: M->Y--; TASM_SetZN(M, M->Y); break;
@@ -169,61 +178,57 @@ void TASM_Eval(struct TASM_Machine* M) {
         case INY: M->Y++; TASM_SetZN(M, M->Y); break;
         case ADC: {
             int Result = M->A + *Data + Carry;
-            if (~(M->A ^ Result) & (M->A ^ *Data) & 0x80) { M->V = 1; }
-            else { M->V = 0; }
             M->A = Result;
             TASM_SetZN(M, M->A);
-            TASM_SetC(M, M->A, 0xFF);
+            TASM_SetC(M, M->A, 0x100);
+            TASM_SetV(M, M->A, Result, *Data);
             break;
         }
         case SBC: {
             int Inverted = (*Data) ^ 0xFF;
             int Result = M->A + Inverted + Carry;
-            if ((M->A ^ Result) & (M->A ^ Inverted) & 0x80) { M->V = 1; }
-            else { M->V = 0; }
             M->A = Result;
             TASM_SetZN(M, M->A);
-            TASM_SetC(M, M->A, 0xFF);
+            TASM_SetC(M, M->A, 0x100);
+            TASM_SetV(M, M->A, Result, Inverted);
             break;
         }
         case ROL: {
-            int Old = M->C;
-            if(M->A & 0x80) { M->C = 1; }
-            else { M->C = 0; }
-            M->A = (M->A << 1) | Old;
+            if(M->A & 0x88) { M->P |= C; }
+            else { M->P &= ~C; }
+            M->A = (M->A << 1) | Carry;
             TASM_SetZN(M, M->A);
             break;
         }
         case ROR: {
-            int Old = M->C;
-            if(M->A & 0x01) { M->C = 1; }
-            else { M->C = 0; }
-            M->A = (M->A >> 1) | (Old << 7);
+            if(M->A & 0x88) { M->P |= C; }
+            else { M->P &= ~C; }
+            M->A = (M->A >> 1) | (Carry << 7);
             TASM_SetZN(M, M->A);
             break;
         }
         case CMP: {
-            int Result = (M->A - *Data) & 0xFF;
+            unsigned char Result = (M->A - *Data);
             TASM_SetZN(M, Result);
             TASM_SetC(M, M->A, *Data);
             break;
         }
         case CPX: {
-            int Result = (M->X - *Data) & 0xFF;
+            unsigned char Result = (M->X - *Data);
             TASM_SetZN(M, Result);
             TASM_SetC(M, M->X, *Data);
             break;
         }
         case CPY: {
-            int Result = (M->Y - *Data) & 0xFF;
+            unsigned char Result = (M->Y - *Data);
             TASM_SetZN(M, Result);
             TASM_SetC(M, M->Y, *Data);
             break;
         }
-        case BEQ: if(M->Z) {M->PC = *Data-1;} break;
-        case BNE: if(!M->Z) {M->PC = *Data-1;} break;
-        case BMI: if(M->N) {M->PC = *Data-1;} break;
-        case BPL: if(!M->N) {M->PC = *Data-1;} break;
+        case BEQ: if(M->P & Z) {M->PC = *Data-1;} break;
+        case BNE: if(!(M->P & Z)) {M->PC = *Data-1;} break;
+        case BMI: if(M->P & N) {M->PC = *Data-1;} break;
+        case BPL: if(!(M->P & N)) {M->PC = *Data-1;} break;
         case JMP: M->PC = *Data-1; break;
         case JSR:
             M->RAM[0x100 + M->SP] = (M->PC >> 8) & 0xFF;
@@ -239,12 +244,6 @@ void TASM_Eval(struct TASM_Machine* M) {
             M->PC = (M->PC << 8) | M->RAM[0x100 + M->SP];
             break;
     }
-    
-    TASM_OverflowMem(M->X);
-    TASM_OverflowMem(M->Y);
-    TASM_OverflowMem(M->A);
-    TASM_OverflowMem(M->SP);
-    if(M->ROM[M->PC][2] == IMM) { TASM_OverflowMem(*Data); }
     M->PC++;
 }
 
@@ -259,16 +258,13 @@ void* TASM_Start(char* F) {
     if(!Program) { printf("--<File missing!>--\n"); exit(1); }
     
     M->ROM = calloc(1, sizeof(int*));
-    M->RAM = calloc(0xFFFF, sizeof(int));
-    M->PC = 0;
+    M->RAM = calloc(0x10000, sizeof(char));
+    M->PC = 0x0000;
     M->SP = 0xFF;
     M->A = 0;
     M->X = 0;
     M->Y = 0;
-    M->C = 0;
-    M->Z = 0;
-    M->V = 0;
-    M->N = 0;
+    M->P = 0x00;
     
     while(fgets(Instruction, 21, Program)) {
         int* T = TASM_Parser(Instruction, M);
@@ -297,7 +293,7 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
         printf("\"%s\"\n", Name);
         printf("(PC)$%X,  (SP)$%X\n", M->PC, M->SP);
         printf("(A)$%X,  (X)$%X,  (Y)$%X\n", M->A, M->X, M->Y);
-        printf("(C)%d,  (Z)%d,  (V)%d,  (N)%d\n", M->C, M->Z, M->V, M->N);
+        printf("(C)%d (V)%d (N)%d (Z)%d\n", M->P&C!=0, M->P&V!=0, M->P&N!=0, M->P&Z!=0);
         
 		printf("--<RAM>----------------------\n");
 		for(Idx = 0; Idx < 0xFFFF; Idx++) {
@@ -305,21 +301,17 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
 		}
         
         Start = clock();
-        while(clock() < Start + (CLOCKS_PER_SEC * 0.1)) {}
+        while(clock() < Start + (CLOCKS_PER_SEC * 0.2)) {}
 	}
 }
 
 int main(int ArgC, char* ArgV[]) {
     struct TASM_Machine* M;
-    int Idx;
     if(!ArgV[1]) { printf("--<File missing!>--\n"); exit(1); }
     
     M = TASM_Start(ArgV[1]);
     TASM_Execute(M, ArgV[1]);
     
-    for(Idx = 0; M->ROM[Idx+1] != NULL; Idx++) {
-    	free(M->ROM[Idx]);
-    }
-    free(M->RAM);
+    free(M);
     return 0;
 }
