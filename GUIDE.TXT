@@ -31,7 +31,6 @@ PLP Pull flags from stack
 PHA Push A to stack
 PLA Pull A from stack
 CLC Clear C flag
-CLV Set C flag
 DEC Decrement address
 DEX Decrement X
 DEY Decrement Y

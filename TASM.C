@@ -3,27 +3,23 @@
 #include <time.h>
 
 #define C 0x1
-#define V 0x2
-#define Z 0x4
-#define N 0x8
+#define Z 0x2
+#define N 0x4
 
 #define TASM_CheckOpr(s1, s2) ((s1)[0]==(s2)[0] && (s1)[1]==(s2)[1] && (s1)[2]==(s2)[2])
 #define TASM_SetZN(m, v) do {        \
     if ((v) == 0) { (m)->P |= Z; }   \
-    else { (m)->P &= ~Z; }    \
+    else { (m)->P &= ~Z; }           \
     if ((v) & 0x80) { (m)->P |= N; } \
     else { (m)->P &= ~N; } } while(0)
 #define TASM_SetC(m, v1, v2) do {    \
     if((v1) >= (v2)) { (m)->P |= C;} \
     else { (m)->P &= ~C; } } while(0)
-#define TASM_SetV(m, v1, v2, v3) do {                          \
-    if (((v1) ^ (v2)) & ((v1) ^ (v3)) & 0x80) { (m)->P |= V; } \
-    else { (m)->P &= ~V; }} while(0)
 
 enum TASM_INSTRUCTIONS {
     NOP,
     LDA, LDX, LDY, STA, STX, STY, TAX, TAY, TSX, TXA, TYA, TXS, /* memory */
-    PHP, PLP, PHA, PLA, CLC, CLV,                               /* stack and flags */
+    PHP, PLP, PHA, PLA, CLC,                                    /* stack and flags */
     DEC, DEX, DEY, INC, INX, INY, ADC, SBC, ROL, ROR,           /* arithmetic */
     CMP, CPX, CPY, BEQ, BNE, BMI, BPL, JMP, JSR, RTS            /* condition and skip*/
 };
@@ -36,9 +32,10 @@ enum TASM_ADDRESSING {
 };
 
 struct TASM_Machine {
-    unsigned int** ROM; unsigned int PC;                                     /* array that represents program (opcode & memory) */
-    unsigned char* RAM; unsigned char SP;                                    /* array that represents memory */
-    unsigned char A; unsigned char X; unsigned char Y; unsigned char P;      /* registers and flags */
+    unsigned int** ROM; unsigned int PC;               /* array that represents program */
+    unsigned char* RAM; unsigned char SP;              /* array that represents memory */
+    unsigned char A; unsigned char X; unsigned char Y; /* registers */
+    unsigned char P;                                   /* flags */
 };
 
 /* parses string into token */
@@ -95,7 +92,6 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     else if (TASM_CheckOpr(Line, "PHA")) { T[0] = PHA; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "PLA")) { T[0] = PLA; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "CLC")) { T[0] = CLC; T[2] = IMP; }
-    else if (TASM_CheckOpr(Line, "CLV")) { T[0] = CLV; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "DEC")) { T[0] = DEC; }
     else if (TASM_CheckOpr(Line, "DEX")) { T[0] = DEX; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "DEY")) { T[0] = DEY; T[2] = IMP; }
@@ -191,7 +187,6 @@ void TASM_Eval(struct TASM_Machine* M) {
         M->A = Result;
         TASM_SetZN(M, M->A);
         TASM_SetC(M, Result, 0x100);
-        TASM_SetV(M, M->A, Result, *Data);
         break;
     }
     case SBC: {
@@ -200,7 +195,6 @@ void TASM_Eval(struct TASM_Machine* M) {
         M->A = Result;
         TASM_SetZN(M, M->A);
         TASM_SetC(M, Result, 0x100);
-        TASM_SetV(M, M->A, Result, Inverted);
         break;
     }
     case ROL: {
@@ -275,7 +269,7 @@ void* TASM_Start(char* F) {
     M->A = 0;
     M->X = 0;
     M->Y = 0;
-    M->P = 0x00;
+    M->P = 0;
 
     while (fgets(Instruction, 21, Program)) {
         int* T = TASM_Parser(Instruction, M);
