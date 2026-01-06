@@ -175,7 +175,6 @@ void TASM_Eval(struct TASM_Machine* M) {
     case PHP: M->RAM[0x100 + M->SP] = M->P; M->SP--; break;
     case PLP: M->SP++; M->P = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
     case CLC: M->P &= ~C; break;
-    case CLV: M->P &= ~V; break;
     case DEC: (*Data)--; TASM_SetZN(M, *Data); break;
     case DEX: M->X--; TASM_SetZN(M, M->X); break;
     case DEY: M->Y--; TASM_SetZN(M, M->Y); break;
@@ -311,7 +310,7 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
         printf("\"%s\"\n", Name);
         printf("(PC)$%X,  (SP)$%X\n", M->PC, M->SP);
         printf("(A)$%X,  (X)$%X,  (Y)$%X\n", M->A, M->X, M->Y);
-        printf("(C)%d (V)%d (N)%d (Z)%d\n", M->P & C != 0, M->P & V != 0, M->P & N != 0, M->P & Z != 0);
+        printf("(C)%d (N)%d (Z)%d\n", M->P & C != 0, M->P & N != 0, M->P & Z != 0);
 
         printf("--<RAM>----------------------\n");
         for (Idx = 0; Idx < 0xFFFF; Idx++) {
