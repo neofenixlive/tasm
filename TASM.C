@@ -36,8 +36,8 @@ enum TASM_ADDRESSING {
 };
 
 struct TASM_Machine {
-    unsigned int** ROM; unsigned int PC; /* array that represents program (opcode & memory) */
-    unsigned char* RAM; unsigned char SP;                  /* array that represents memory */
+    unsigned int** ROM; unsigned int PC;                                     /* array that represents program (opcode & memory) */
+    unsigned char* RAM; unsigned char SP;                                    /* array that represents memory */
     unsigned char A; unsigned char X; unsigned char Y; unsigned char P;      /* registers and flags */
 };
 
@@ -50,10 +50,8 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     int IsBin = 0;
     int SaveAs16 = 0;
     char* Line = NULL;
+    void* Temp = NULL;
 
-    if (T == NULL) {
-        return NULL;
-    }
     T[0] = 0;
     T[1] = 0;
     T[2] = 0;
@@ -64,14 +62,14 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
         }
         if (S[Idx] == ';') { break; }
 
-        /* check for formatted string memory reallocation failure */
-        Line = realloc(Line, sizeof(char) * (SubIdx + 2));
-        if (Line == NULL) {
+        Temp = realloc(Line, sizeof(char) * (SubIdx + 2));
+        if (Temp == NULL) {
             free(Line);
             free(T);
-            printf("--<String formatting failed!>--\n");
-            return NULL;
+            printf("--<Instruction parser failed!>--\n");
+            exit(1);
         }
+        Line = Temp;
 
         Line[SubIdx] = S[Idx];
         Line[SubIdx + 1] = '\0';
@@ -157,7 +155,7 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
 void TASM_Eval(struct TASM_Machine* M) {
     int Value = 0;
     int Carry = 0;
-    unsigned char* Data = (unsigned char*)&Value;
+    int* Data = &Value;
     if (M->ROM[M->PC][2] == IMM) { *Data = M->ROM[M->PC][1]; }
     if (M->ROM[M->PC][2] == ABS) { Data = &M->RAM[M->ROM[M->PC][1]]; }
     if (M->P & C) { Carry = 1; }
@@ -241,7 +239,7 @@ void TASM_Eval(struct TASM_Machine* M) {
     case BNE: if (!(M->P & Z)) { M->PC = *Data - 2; } break;
     case BMI: if (M->P & N) { M->PC = *Data - 2; } break;
     case BPL: if (!(M->P & N)) { M->PC = *Data - 2; } break;
-    case JMP: M->PC = *Data - 1; break;
+    case JMP: M->PC = *Data - 2; break;
     case JSR:
         M->RAM[0x100 + M->SP] = (M->PC >> 8) & 0xFF;
         M->SP--;
@@ -267,6 +265,7 @@ void* TASM_Start(char* F) {
     char* Instruction = malloc(sizeof(char) * 21);
 
     int Idx = 0;
+    void* Temp = NULL;
     if (!Program) { printf("--<File missing!>--\n"); exit(1); }
 
     M->ROM = calloc(1, sizeof(int*));
@@ -281,18 +280,18 @@ void* TASM_Start(char* F) {
     while (fgets(Instruction, 21, Program)) {
         int* T = TASM_Parser(Instruction, M);
 
-        /* check for ROM memory reallocation failure */
-        M->ROM = realloc(M->ROM, sizeof(int*) * (Idx + 2));
-        if (M->ROM == NULL) {
+        Temp = realloc(M->ROM, sizeof(int*) * (Idx + 2));
+        if (Temp == NULL) {
             free(T);
-            free(M->ROM);
             free(Instruction);
             fclose(Program);
+            free(M->ROM);
             free(M->RAM);
             free(M);
             printf("--<Read-only memory failed!>--\n");
             exit(1);
         }
+        M->ROM = Temp;
 
         M->ROM[Idx] = T;
         M->ROM[Idx + 1] = NULL;
