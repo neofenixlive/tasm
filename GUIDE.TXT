@@ -25,6 +25,7 @@ TAY Transfers A to Y
 TSX Transfers SP to A
 TXA Transfers X to A
 TYA Transfers Y to A
+TXS Transfers X to SP
 PHP Push flags to stack
 PLP Pull flags from stack
 PHA Push A to stack
