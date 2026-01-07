@@ -2,9 +2,15 @@
 6502 assembly sub-set written in C89
 
 ---<Limitations>---
-No labels, branches and jumps use line positions
-No overflow, arithmetic functions use 0 to 255
-Every instruction is executed in 1/10 of a second
+No zeropage, its defined as absolute
+No labels, branches and jumps uses line positions
+No overflow, arithmetic uses from 0 to 255
+
+Memory ranges from $0000 to $FFFF, storing 8-bit values
+Stack goes from $0100 to $01FF
+C, Z and N flags are available
+
+Each operation is executed in 1/10 of a second
 Information is displayed to the terminal
 
 ---<Address modes>---
@@ -13,29 +19,35 @@ Information is displayed to the terminal
 "OPR VAL" Absolute
 "OPR VAL,X" Index X
 "OPR VAL,Y" Index Y
+
 '$' Hexadecimal value
 '%' Binary value
-';' Commentary, ignored
+';' Commentary, ignored by parser
 
 ---<Instruction set>---
-NOP Does nothing
-LDA Loads value into A
-LDX Loads value into X
-LDY Loads value into Y
-STA Stores A into address
-STX Stores X into address
-STY Stores Y into address
-TAX Transfers A to X
-TAY Transfers A to Y
-TSX Transfers SP to A
-TXA Transfers X to A
-TYA Transfers Y to A
-TXS Transfers X to SP
+Memory:
+LDA Load value into A
+LDX Load value into X
+LDY Load value into Y
+STA Store A into address
+STX Store X into address
+STY Store Y into address
+TAX Transfer A to X
+TAY Transfer A to Y
+TSX Transfer SP to A
+TXA Transfer X to A
+TYA Transfer Y to A
+TXS Transfer X to SP
+
+Stack and flags:
 PHP Push flags to stack
 PLP Pull flags from stack
 PHA Push A to stack
 PLA Pull A from stack
 CLC Clear C flag
+SEC Set C flag
+
+Arithmetic:
 DEC Decrement address
 DEX Decrement X
 DEY Decrement Y
@@ -46,15 +58,17 @@ ADC Add to A with Carry
 SBC Subtract from A with Carry
 ASL Shift A to left
 LSR Shift A to right
-ROL Rotate A to left with Carry
-ROR Rotate A to right with Carry
+ROL Shift A to left with Carry
+ROR Shift A to right with Carry
+
+Control flow:
 CMP Compare A to value 
 CPX Compare X to value
 CPY Compare Y to value
-BEQ Branch to value if equal
-BNE Branch to value if not equal
-BMI Branch to value if minus
-BPL Branch to value if plus
+BEQ Branch to line if equal
+BNE Branch to line if not equal
+BMI Branch to line if minus
+BPL Branch to line if plus
 JMP Jump to line
 JSR Jump to subroutine at line
 RTS Return from subroutine

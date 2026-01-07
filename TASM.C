@@ -19,23 +19,23 @@
 enum TASM_INSTRUCTIONS {
     NOP,
     LDA, LDX, LDY, STA, STX, STY, TAX, TAY, TSX, TXA, TYA, TXS, /* memory */
-    PHP, PLP, PHA, PLA, CLC,                                    /* stack and flags */
+    PHP, PLP, PHA, PLA, CLC, SEC,                               /* stack and flags */
     DEC, DEX, DEY, INC, INX, INY, ADC, SBC, ASL, LSR, ROL, ROR, /* arithmetic */
-    CMP, CPX, CPY, BEQ, BNE, BMI, BPL, JMP, JSR, RTS            /* condition and skip*/
+    CMP, CPX, CPY, BEQ, BNE, BMI, BPL, JMP, JSR, RTS            /* control flow */
 };
 
 enum TASM_ADDRESS {
-    NOA, /* no addressing */
-    IMP, /* no operand */
-    IMM, /* literal value */
-    ABS, /* value address */
-    IDX, /* address index X */
-    IDY  /* address index Y */
+    NOA, /* no address */
+    IMP, /* no value */
+    IMM, /* define value */
+    ABS, /* address value */
+    IDX, /* index X */
+    IDY  /* index Y */
 };
 
 struct TASM_Machine {
-    unsigned int** ROM; unsigned int PC;               /* array that represents program */
-    unsigned char* RAM; unsigned char SP;              /* array that represents memory */
+    unsigned int** ROM; unsigned int PC;               /* program */
+    unsigned char* RAM; unsigned char SP;              /* memory */
     unsigned char A; unsigned char X; unsigned char Y; /* registers */
     unsigned char P;                                   /* flags */
 };
@@ -96,6 +96,7 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     else if (TASM_CheckOpr(Line, "PHA")) { T[0] = PHA; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "PLA")) { T[0] = PLA; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "CLC")) { T[0] = CLC; T[2] = IMP; }
+    else if (TASM_CheckOpr(Line, "SEC")) { T[0] = SEC; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "DEC")) { T[0] = DEC; }
     else if (TASM_CheckOpr(Line, "DEX")) { T[0] = DEX; T[2] = IMP; }
     else if (TASM_CheckOpr(Line, "DEY")) { T[0] = DEY; T[2] = IMP; }
@@ -189,6 +190,7 @@ void TASM_Eval(struct TASM_Machine* M) {
     case PHP: M->RAM[0x100 + M->SP] = M->P; M->SP--; break;
     case PLP: M->SP++; M->P = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
     case CLC: M->P &= ~FLAG_C; break;
+    case SEC: M->P |= FLAG_C; break;
     case DEC: (*Data)--; TASM_SetZN(M, *Data); break;
     case DEX: M->X--; TASM_SetZN(M, M->X); break;
     case DEY: M->Y--; TASM_SetZN(M, M->Y); break;
@@ -336,6 +338,7 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
         TASM_Eval(M);
         SubIdx = 0;
         Start = clock();
+        printf("\033[H");
 
         printf("--<CPU>----------------------\n");
         printf("\"%s\"\n", Name);
@@ -349,7 +352,6 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
             if (SubIdx == 4) { putchar('\n'); SubIdx = 0; }
         }
         
-        printf("\033[0J\n\033[H");
         while (clock() < Start + (CLOCKS_PER_SEC * 0.1)) {}
     }
 }
