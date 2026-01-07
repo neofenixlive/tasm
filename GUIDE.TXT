@@ -1,18 +1,21 @@
 ---<TinyAssembly>---
 6502 assembly sub-set written in C89
 
----<Syntax>---
-"OPERATION OPERAND"
-
-'#' Literal operand
-'$' Hexadecimal operand
-'%' Binary operand
-';' Comment, ignores anything after
-
+---<Limitations>---
 No labels, branches and jumps use line positions
 No overflow, arithmetic functions use 0 to 255
 Every instruction is executed in 1/10 of a second
-Information is displayed into the terminal
+Information is displayed to the terminal
+
+---<Address modes>---
+"OPR" Implied
+"OPR #VAL" Immediate
+"OPR VAL" Absolute
+"OPR VAL,X" Index X
+"OPR VAL,Y" Index Y
+'$' Hexadecimal value
+'%' Binary value
+';' Commentary, ignored
 
 ---<Instruction set>---
 NOP Does nothing

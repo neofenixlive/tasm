@@ -2,19 +2,19 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define C 0x1
-#define Z 0x2
-#define N 0x4
+#define FLAG_C 0x1
+#define FLAG_Z 0x2
+#define FLAG_N 0x4
 
 #define TASM_CheckOpr(s1, s2) ((s1)[0]==(s2)[0] && (s1)[1]==(s2)[1] && (s1)[2]==(s2)[2])
 #define TASM_SetZN(m, v) do {        \
-    if ((v) == 0) { (m)->P |= Z; }   \
-    else { (m)->P &= ~Z; }           \
-    if ((v) & 0x80) { (m)->P |= N; } \
-    else { (m)->P &= ~N; } } while(0)
+    if ((v) == 0) { (m)->P |= FLAG_Z; }   \
+    else { (m)->P &= ~FLAG_Z; }           \
+    if ((v) & 0x80) { (m)->P |= FLAG_N; } \
+    else { (m)->P &= ~FLAG_N; } } while(0)
 #define TASM_SetC(m, v1, v2) do {    \
-    if((v1) >= (v2)) { (m)->P |= C;} \
-    else { (m)->P &= ~C; } } while(0)
+    if((v1) >= (v2)) { (m)->P |= FLAG_C;} \
+    else { (m)->P &= ~FLAG_C; } } while(0)
 
 enum TASM_INSTRUCTIONS {
     NOP,
@@ -24,11 +24,13 @@ enum TASM_INSTRUCTIONS {
     CMP, CPX, CPY, BEQ, BNE, BMI, BPL, JMP, JSR, RTS            /* condition and skip*/
 };
 
-enum TASM_ADDRESSING {
+enum TASM_ADDRESS {
     NOA, /* no addressing */
     IMP, /* no operand */
     IMM, /* literal value */
-    ABS  /* value address */
+    ABS, /* value address */
+    IDX, /* address index X */
+    IDY  /* address index Y */
 };
 
 struct TASM_Machine {
@@ -46,6 +48,7 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     int IsHex = 0;
     int IsBin = 0;
     int SaveAs16 = 0;
+    
     char* Line = NULL;
     void* Temp = NULL;
 
@@ -72,6 +75,7 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
         Line[SubIdx + 1] = '\0';
         SubIdx++;
     }
+    
     if (SubIdx < 3) { free(Line); return T; }
 
     if (TASM_CheckOpr(Line, "NOP")) { T[0] = NOP; T[2] = IMP; }
@@ -124,6 +128,11 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
     else if (Line[Idx] == '%') { IsBin = 1; Idx++; }
 
     while (Line[Idx] != '\0') {
+        if (T[2] == ABS && Line[Idx] == ',') {
+            if (Line[Idx + 1] == 'X') { T[2] = IDX; break; }
+            else if (Line[Idx + 1] == 'Y') { T[2] = IDY; break; }
+        }
+        
         if (IsHex) {
             T[1] *= 16;
             if (Line[Idx] >= '0' && Line[Idx] <= '9') {
@@ -141,10 +150,11 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
             T[1] *= 10;
             T[1] += Line[Idx] - '0';
         }
+        
         Idx++;
     }
-    if (!SaveAs16 && T[2] != ABS) { T[1] &= 0xFF; }
-
+    
+    if (!SaveAs16 && T[2] == IMM) { T[1] &= 0xFF; }
     free(Line);
     return T;
 }
@@ -152,11 +162,13 @@ void* TASM_Parser(char* S, struct TASM_Machine* M) {
 /* evaluates current token */
 void TASM_Eval(struct TASM_Machine* M) {
     int Value = 0;
-    int Carry = 0;
     int* Data = &Value;
+    int LastC = M->P & FLAG_C;
+    
     if (M->ROM[M->PC][2] == IMM) { *Data = M->ROM[M->PC][1]; }
-    if (M->ROM[M->PC][2] == ABS) { Data = &M->RAM[M->ROM[M->PC][1]]; }
-    if (M->P & C) { Carry = 1; }
+    else if (M->ROM[M->PC][2] == ABS) { Data = (unsigned int*)&M->RAM[M->ROM[M->PC][1]]; }
+    else if (M->ROM[M->PC][2] == IDX) { Data = (unsigned int*)&M->RAM[M->ROM[M->PC][1] + M->X]; }
+    else if (M->ROM[M->PC][2] == IDY) { Data = (unsigned int*)&M->RAM[M->ROM[M->PC][1] + M->Y]; }
 
     switch (M->ROM[M->PC][0]) {
     default: break;
@@ -176,7 +188,7 @@ void TASM_Eval(struct TASM_Machine* M) {
     case PLA: M->SP++; M->A = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
     case PHP: M->RAM[0x100 + M->SP] = M->P; M->SP--; break;
     case PLP: M->SP++; M->P = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
-    case CLC: M->P &= ~C; break;
+    case CLC: M->P &= ~FLAG_C; break;
     case DEC: (*Data)--; TASM_SetZN(M, *Data); break;
     case DEX: M->X--; TASM_SetZN(M, M->X); break;
     case DEY: M->Y--; TASM_SetZN(M, M->Y); break;
@@ -184,7 +196,7 @@ void TASM_Eval(struct TASM_Machine* M) {
     case INX: M->X++; TASM_SetZN(M, M->X); break;
     case INY: M->Y++; TASM_SetZN(M, M->Y); break;
     case ADC: {
-        int Result = M->A + *Data + Carry;
+        int Result = M->A + *Data + LastC;
         M->A = Result;
         TASM_SetZN(M, M->A);
         TASM_SetC(M, Result, 0x100);
@@ -192,37 +204,37 @@ void TASM_Eval(struct TASM_Machine* M) {
     }
     case SBC: {
         int Inverted = (*Data) ^ 0xFF;
-        int Result = M->A + Inverted + Carry;
+        int Result = M->A + Inverted + LastC;
         M->A = Result;
         TASM_SetZN(M, M->A);
         TASM_SetC(M, Result, 0x100);
         break;
     }
     case ASL: {
-        if (M->A & 0x80) { M->P |= C; }
-        else { M->P &= ~C; }
+        if (M->A & 0x80) { M->P |= FLAG_C; }
+        else { M->P &= ~FLAG_C; }
         M->A = (M->A << 1);
         TASM_SetZN(M, M->A);
         break;
     }
     case LSR: {
-        if (M->A & 0x1) { M->P |= C; }
-        else { M->P &= ~C; }
+        if (M->A & 0x1) { M->P |= FLAG_C; }
+        else { M->P &= ~FLAG_C; }
         M->A = (M->A >> 1);
         TASM_SetZN(M, M->A);
         break;
     }
     case ROL: {
-        if (M->A & 0x80) { M->P |= C; }
-        else { M->P &= ~C; }
-        M->A = (M->A << 1) | Carry;
+        if (M->A & 0x80) { M->P |= FLAG_C; }
+        else { M->P &= ~FLAG_C; }
+        M->A = (M->A << 1) | LastC;
         TASM_SetZN(M, M->A);
         break;
     }
     case ROR: {
-        if (M->A & 0x1) { M->P |= C; }
-        else { M->P &= ~C; }
-        M->A = (M->A >> 1) | (Carry << 7);
+        if (M->A & 0x1) { M->P |= FLAG_C; }
+        else { M->P &= ~FLAG_C; }
+        M->A = (M->A >> 1) | (LastC << 7);
         TASM_SetZN(M, M->A);
         break;
     }
@@ -244,10 +256,10 @@ void TASM_Eval(struct TASM_Machine* M) {
         TASM_SetC(M, M->Y, *Data);
         break;
     }
-    case BEQ: if (M->P & Z) { M->PC = *Data - 2; } break;
-    case BNE: if (!(M->P & Z)) { M->PC = *Data - 2; } break;
-    case BMI: if (M->P & N) { M->PC = *Data - 2; } break;
-    case BPL: if (!(M->P & N)) { M->PC = *Data - 2; } break;
+    case BEQ: if (M->P & FLAG_Z) { M->PC = *Data - 2; } break;
+    case BNE: if (!(M->P & FLAG_Z)) { M->PC = *Data - 2; } break;
+    case BMI: if (M->P & FLAG_N) { M->PC = *Data - 2; } break;
+    case BPL: if (!(M->P & FLAG_N)) { M->PC = *Data - 2; } break;
     case JMP: M->PC = *Data - 2; break;
     case JSR:
         M->RAM[0x100 + M->SP] = (M->PC >> 8) & 0xFF;
@@ -263,6 +275,7 @@ void TASM_Eval(struct TASM_Machine* M) {
         M->PC = (M->PC << 8) | M->RAM[0x100 + M->SP];
         break;
     }
+    
     M->PC++;
 }
 
@@ -318,22 +331,25 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
     int SubIdx;
     clock_t Start;
 
+    printf("\033[2J");
     while (M->ROM[M->PC] != NULL) {
         TASM_Eval(M);
+        SubIdx = 0;
+        Start = clock();
 
-        printf("\033[2J\033[H");
         printf("--<CPU>----------------------\n");
         printf("\"%s\"\n", Name);
-        printf("(PC)$%X,  (SP)$%X\n", M->PC, M->SP);
-        printf("(A)$%X,  (X)$%X,  (Y)$%X\n", M->A, M->X, M->Y);
-        printf("(C)%d (V)%d (N)%d (Z)%d\n", M->P & C != 0, M->P & V != 0, M->P & N != 0, M->P & Z != 0);
+        printf("(PC)$%04X, (SP)$%04X\n", M->PC, M->SP);
+        printf("(A)$%02X, (X)$%02X, (Y)$%02X\n", M->A, M->X, M->Y);
+        printf("(C)%d (N)%d (Z)%d\n", M->P & FLAG_C != 0, M->P & FLAG_N != 0, M->P & FLAG_Z != 0);
 
         printf("--<RAM>----------------------\n");
         for (Idx = 0; Idx < 0xFFFF; Idx++) {
-            if (M->RAM[Idx] != 0) { printf("($%X)$%X ", Idx, M->RAM[Idx]); }
+            if (M->RAM[Idx] != 0) { printf("($%04X)$%02X ", Idx, M->RAM[Idx]); SubIdx++; }
+            if (SubIdx == 4) { putchar('\n'); SubIdx = 0; }
         }
-
-        Start = clock();
+        
+        printf("\033[0J\n\033[H");
         while (clock() < Start + (CLOCKS_PER_SEC * 0.1)) {}
     }
 }
@@ -341,7 +357,7 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
 int main(int ArgC, char* ArgV[]) {
     struct TASM_Machine* M;
     if (!ArgV[1]) { printf("--<File missing!>--\n"); exit(1); }
-
+    
     M = TASM_Start(ArgV[1]);
     TASM_Execute(M, ArgV[1]);
 
