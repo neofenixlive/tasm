@@ -338,14 +338,15 @@ void TASM_Execute(struct TASM_Machine* M, char* Name) {
         TASM_Eval(M);
         SubIdx = 0;
         Start = clock();
+        
         printf("\033[H");
-
+        
         printf("--<CPU>----------------------\n");
         printf("\"%s\"\n", Name);
         printf("(PC)$%04X, (SP)$%04X\n", M->PC, M->SP);
         printf("(A)$%02X, (X)$%02X, (Y)$%02X\n", M->A, M->X, M->Y);
-        printf("(C)%d (N)%d (Z)%d\n", M->P & FLAG_C != 0, M->P & FLAG_N != 0, M->P & FLAG_Z != 0);
-
+        printf("(C)%d (N)%d (Z)%d\n", ((M->P & FLAG_C) != 0), ((M->P & FLAG_N) != 0), ((M->P & FLAG_Z) != 0));
+        
         printf("--<RAM>----------------------\n");
         for (Idx = 0; Idx < 0xFFFF; Idx++) {
             if (M->RAM[Idx] != 0) { printf("($%04X)$%02X ", Idx, M->RAM[Idx]); SubIdx++; }
