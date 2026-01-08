@@ -157,7 +157,7 @@ void* TASM_Parser(char* S) {
         
         Idx++;
     }
-    if (SaveAs16) { T[3] = (T[2] >> 8) & 0xFF00; }
+    if (SaveAs16) { T[3] = (T[2] >> 8) & 0xFF; }
     T[2] &= 0xFF;
     
     free(Line);
@@ -166,18 +166,18 @@ void* TASM_Parser(char* S) {
 
 /* evaluates current token */
 void TASM_Eval(struct TASM_Machine* M) {
-    int Value = (M->ROM[M->PC+3] << 8) | M->ROM[M->PC+2];
-    int* Data = NULL;
+    int Value = (M->ROM[M->PC*4+3] << 8) | M->ROM[M->PC*4+2];
+    unsigned char* Data = NULL;
     int LastC = M->P & FLAG_C;
        
     /* data for address modes */
-    if (M->ROM[M->PC+1] == IMM) { Data = &Value; }
-    else if (M->ROM[M->PC+1] == ABS) { Data = (unsigned int*)&M->RAM[Value]; }
-    else if (M->ROM[M->PC+1] == IDX) { Data = (unsigned int*)&M->RAM[Value + M->X]; }
-    else if (M->ROM[M->PC+1] == IDY) { Data = (unsigned int*)&M->RAM[Value + M->Y]; }
+    if (M->ROM[M->PC*4+1] == IMM) { Data = (unsigned char*)&Value; }
+    else if (M->ROM[M->PC*4+1] == ABS) { Data = &M->RAM[Value]; }
+    else if (M->ROM[M->PC*4+1] == IDX) { Data = &M->RAM[Value + M->X]; }
+    else if (M->ROM[M->PC*4+1] == IDY) { Data = &M->RAM[Value + M->Y]; }
 
     /* operation execution */
-    switch (M->ROM[M->PC]) {
+    switch (M->ROM[M->PC*4]) {
     default: break;
     case LDA: M->A = *Data; break;
     case LDX: M->X = *Data; break;
@@ -266,7 +266,7 @@ void TASM_Eval(struct TASM_Machine* M) {
         break;
     }
     
-    M->PC += 4;
+    M->PC++;
     M->PC &= 0xFFFF;
 }
 
@@ -274,7 +274,7 @@ void TASM_Eval(struct TASM_Machine* M) {
 void* TASM_Start(char* F) {
     struct TASM_Machine* M = malloc(sizeof(struct TASM_Machine));
     FILE* Program = fopen(F, "r");
-    char* Instruction = malloc(sizeof(char) * 21);
+    char* Instruction = malloc(sizeof(char) * 128);
     int Idx = 0;
     
     if (!Program) { printf("--<File missing!>--\n"); exit(1); }
@@ -290,15 +290,16 @@ void* TASM_Start(char* F) {
     M->P = 0;
 
     /* write operations */
-    while (fgets(Instruction, 21, Program)) {
+    while (fgets(Instruction, 128, Program)) {
         unsigned int* T = TASM_Parser(Instruction);
         M->ROM[Idx] = (char)T[0];
-        M->ROM[Idx + 1] = (char)T[1];
-        M->ROM[Idx + 2] = (char)T[2];
-        M->ROM[Idx + 3] = (char)T[3];
-        M->ROM[Idx + 4] = END;
+        M->ROM[Idx+1] = (char)T[1];
+        M->ROM[Idx+2] = (char)T[2];
+        M->ROM[Idx+3] = (char)T[3];
         Idx += 4;
+        free(T);
     }
+    M->ROM[Idx] = END;
 
     free(Instruction);
     fclose(Program);
@@ -312,14 +313,14 @@ void TASM_Execute(struct TASM_Machine* M, int PrintInfo, int DelayExec) {
     clock_t Sleep;
 
     /* prints information and delays execution by 0.1 seconds */
-    while (M->ROM[M->PC] != END) {
+    while (M->ROM[M->PC*4] != END) {
         TASM_Eval(M);
         
         if (PrintInfo) {
             SubIdx = 0;
             printf("\033[2J");
             printf("--<TinyAssembly>--------------\n");
-            printf("(PC)$%04X, (SP)$%04X\n", M->PC, M->SP);
+            printf("(PC)$%04X, (SP)$%02X\n", M->PC, M->SP);
             printf("(A)$%02X, (X)$%02X, (Y)$%02X\n", M->A, M->X, M->Y);
             printf("(C)%d (N)%d (Z)%d\n", ((M->P & FLAG_C) != 0), ((M->P & FLAG_N) != 0), ((M->P & FLAG_Z) != 0));
             printf("--<Memory>--------------------\n");
@@ -333,6 +334,9 @@ void TASM_Execute(struct TASM_Machine* M, int PrintInfo, int DelayExec) {
             while (clock() < Sleep + (CLOCKS_PER_SEC/10)) {}
         }
     }
+    
+    free(M->RAM);
+    free(M->ROM);
 }
 
 int main(int ArgC, char* ArgV[]) {
