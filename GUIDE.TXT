@@ -35,14 +35,10 @@ STX Store X into address
 STY Store Y into address
 TAX Transfer A to X
 TAY Transfer A to Y
-TSX Transfer SP to A
 TXA Transfer X to A
 TYA Transfer Y to A
-TXS Transfer X to SP
 
 Stack and flags:
-PHP Push flags to stack
-PLP Pull flags from stack
 PHA Push A to stack
 PLA Pull A from stack
 CLC Clear C flag
@@ -57,13 +53,11 @@ INX Increment X
 INY Increment Y
 ADC Add to A with Carry
 SBC Subtract from A with Carry
-ASL Shift A to left
-LSR Shift A to right
 ROL Shift A to left with Carry
 ROR Shift A to right with Carry
 
 Control flow:
-CMP Compare A to value 
+CMP Compare A to value
 CPX Compare X to value
 CPY Compare Y to value
 BEQ Branch to line if equal
@@ -74,4 +68,4 @@ JMP Jump to line
 JSR Jump to subroutine at line
 RTS Return from subroutine
 NOP No operation
-EDN End program
+END End program

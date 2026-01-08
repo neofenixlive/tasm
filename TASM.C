@@ -19,10 +19,10 @@
 
 enum TASM_INSTRUCTIONS {
     NOP,
-    LDA, LDX, LDY, STA, STX, STY, TAX, TAY, TSX, TXA, TYA, TXS, /* memory */
-    PHP, PLP, PHA, PLA, CLC, SEC,                               /* stack and flags */
-    DEC, DEX, DEY, INC, INX, INY, ADC, SBC, ASL, LSR, ROL, ROR, /* arithmetic */
-    CMP, CPX, CPY, BEQ, BNE, BMI, BPL, JMP, JSR, RTS,           /* control flow */
+    LDA, LDX, LDY, STA, STX, STY, TAX, TAY, TXA, TYA, /* memory */
+    PHA, PLA, CLC, SEC,                               /* stack and flags */
+    DEC, DEX, DEY, INC, INX, INY, ADC, SBC, ROL, ROR, /* arithmetic */
+    CMP, CPX, CPY, BEQ, BNE, BMI, BPL, JMP, JSR, RTS, /* control flow */
     END
 };
 
@@ -40,7 +40,7 @@ struct TASM_Machine {
     unsigned char* ROM; unsigned int PC;               /* program */
     unsigned char* RAM; unsigned char SP;              /* memory */
     unsigned char A; unsigned char X; unsigned char Y; /* registers */
-    unsigned int P;                                    /* flags */
+    unsigned char P;                                   /* flags */
 };
 
 /* parses string into token */
@@ -86,12 +86,8 @@ void* TASM_Parser(char* S) {
     else if (TASM_CheckOpr(Line, "STY")) { T[0] = STY; }
     else if (TASM_CheckOpr(Line, "TAX")) { T[0] = TAX; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "TAY")) { T[0] = TAY; T[1] = IMP; }
-    else if (TASM_CheckOpr(Line, "TSX")) { T[0] = TSX; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "TXA")) { T[0] = TXA; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "TYA")) { T[0] = TYA; T[1] = IMP; }
-    else if (TASM_CheckOpr(Line, "TXS")) { T[0] = TXS; T[1] = IMP; }
-    else if (TASM_CheckOpr(Line, "PHP")) { T[0] = PHP; T[1] = IMP; }
-    else if (TASM_CheckOpr(Line, "PLP")) { T[0] = PLP; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "PHA")) { T[0] = PHA; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "PLA")) { T[0] = PLA; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "CLC")) { T[0] = CLC; T[1] = IMP; }
@@ -104,8 +100,6 @@ void* TASM_Parser(char* S) {
     else if (TASM_CheckOpr(Line, "INY")) { T[0] = INY; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "ADC")) { T[0] = ADC; }
     else if (TASM_CheckOpr(Line, "SBC")) { T[0] = SBC; }
-    else if (TASM_CheckOpr(Line, "ASL")) { T[0] = ASL; T[1] = IMP; }
-    else if (TASM_CheckOpr(Line, "LSR")) { T[0] = LSR; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "ROL")) { T[0] = ROL; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "ROR")) { T[0] = ROR; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "CMP")) { T[0] = CMP; }
@@ -185,14 +179,10 @@ void TASM_Eval(struct TASM_Machine* M) {
     case STY: *Data = M->Y; break;
     case TAX: M->X = M->A; break;
     case TAY: M->Y = M->A; break;
-    case TSX: M->X = M->SP; break;
     case TXA: M->A = M->X; break;
     case TYA: M->A = M->Y; break;
-    case TXS: M->SP = M->X; break;
     case PHA: M->RAM[0x100 + M->SP] = M->A; M->SP--; break;
     case PLA: M->SP++; M->A = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
-    case PHP: M->RAM[0x100 + M->SP] = M->P; M->SP--; break;
-    case PLP: M->SP++; M->P = M->RAM[0x100 + M->SP]; M->RAM[0x100 + M->SP] = 0; break;
     case CLC: M->P &= ~FLAG_C; break;
     case SEC: M->P |= FLAG_C; break;
     case DEC: (*Data)--; TASM_SetZN(M, *Data); break;
@@ -214,20 +204,6 @@ void TASM_Eval(struct TASM_Machine* M) {
         M->A = Result;
         TASM_SetZN(M, M->A);
         TASM_SetC(M, Result, 0x100);
-        break;
-    }
-    case ASL: {
-        if (M->A & 0x80) { M->P |= FLAG_C; }
-        else { M->P &= ~FLAG_C; }
-        M->A = (M->A << 1);
-        TASM_SetZN(M, M->A);
-        break;
-    }
-    case LSR: {
-        if (M->A & 0x1) { M->P |= FLAG_C; }
-        else { M->P &= ~FLAG_C; }
-        M->A = (M->A >> 1);
-        TASM_SetZN(M, M->A);
         break;
     }
     case ROL: {
@@ -283,6 +259,7 @@ void TASM_Eval(struct TASM_Machine* M) {
     }
     
     M->PC += 4;
+    M->PC &= 0xFFFF;
 }
 
 /* creates a new machine */
