@@ -1,55 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-
-
-
-#define FLAG_C 0x1
-#define FLAG_Z 0x2
-#define FLAG_N 0x4
-
-#define TASM_CheckOpr(s1, s2) ((s1)[0]==(s2)[0] && (s1)[1]==(s2)[1] && (s1)[2]==(s2)[2])
-
-#define TASM_SetZN(m, v) do {             \
-    if ((v) == 0) { (m)->P |= FLAG_Z; }   \
-    else { (m)->P &= ~FLAG_Z; }           \
-    if ((v) & 0x80) { (m)->P |= FLAG_N; } \
-    else { (m)->P &= ~FLAG_N; } } while(0)
-#define TASM_SetC(m, v1, v2) do {         \
-    if((v1) >= (v2)) { (m)->P |= FLAG_C;} \
-    else { (m)->P &= ~FLAG_C; } } while(0)
-
-
-
-enum TASM_INSTRUCTIONS {
-    NOP,
-    LDA, LDX, LDY, STA, STX, STY, TAX, TAY, TXA, TYA, /* memory */
-    PHA, PLA, CLC, SEC,                               /* stack and flags */
-    DEC, DEX, DEY, INC, INX, INY, ADC, SBC, ROL, ROR, /* arithmetic */
-    CMP, CPX, CPY, BEQ, BNE, BMI, BPL, JMP, JSR, RTS, /* control flow */
-    END
-};
-
-enum TASM_ADDRESS {
-    NOA, /* no address */
-    IMP, /* no value */
-    IMM, /* define value */
-    ABS, /* address value */
-    IDX, /* index X */
-    IDY  /* index Y */
-};
-
-
-
-/* assembly enviroment */
-struct TASM_Machine {
-    unsigned char* ROM; unsigned int PC;               /* program */
-    unsigned char* RAM; unsigned char SP;              /* memory */
-    unsigned char A; unsigned char X; unsigned char Y; /* registers */
-    unsigned char P;                                   /* flags */
-};
-
-
+#include "tasm.h"
 
 /* parses string into token */
 void* TASM_Parser(char* S) {
@@ -166,7 +115,7 @@ void* TASM_Parser(char* S) {
 
 /* evaluates current token */
 void TASM_Eval(struct TASM_Machine* M) {
-    int Value = (M->ROM[M->PC*4+3] << 8) | M->ROM[M->PC*4+2];
+    unsigned int Value = (M->ROM[M->PC*4+3] << 8) | M->ROM[M->PC*4+2];
     unsigned char* Data = NULL;
     int LastC = M->P & FLAG_C;
        
@@ -270,33 +219,28 @@ void TASM_Eval(struct TASM_Machine* M) {
     M->PC &= 0xFFFF;
 }
 
-/* creates a new machine */
-void* TASM_Start(char* F) {
+
+
+/* starts a machine */
+void* TASM_Open(char* F) {
     struct TASM_Machine* M = malloc(sizeof(struct TASM_Machine));
-    FILE* Program = fopen(F, "r");
     char* Instruction = malloc(sizeof(char) * 128);
-    int Idx = 0;
+    FILE* Program = fopen(F, "r");
+    int Idx;
     
     if (!Program) { printf("--<File missing!>--\n"); exit(1); }
 
     /* setup new machine */
     M->ROM = calloc(0x4000, sizeof(char));
     M->RAM = calloc(0x2000, sizeof(char));
-    M->PC = 0x0000;
-    M->SP = 0xFF;
-    M->A = 0;
-    M->X = 0;
-    M->Y = 0;
-    M->P = 0;
-
+    
     /* write operations */
-    while (fgets(Instruction, 128, Program)) {
+    for (Idx = 0; fgets(Instruction, 128, Program); Idx += 4) {
         unsigned int* T = TASM_Parser(Instruction);
         M->ROM[Idx] = (char)T[0];
         M->ROM[Idx+1] = (char)T[1];
         M->ROM[Idx+2] = (char)T[2];
         M->ROM[Idx+3] = (char)T[3];
-        Idx += 4;
         free(T);
     }
     M->ROM[Idx] = END;
@@ -306,46 +250,57 @@ void* TASM_Start(char* F) {
     return M;
 }
 
-/* runs a machine */
-void TASM_Execute(struct TASM_Machine* M, int PrintInfo, int DelayExec) {
+/* stops a machine */
+void TASM_Close(struct TASM_Machine* M) {
+    free(M->RAM);
+    free(M->ROM);
+    free(M);
+}
+
+/* executes a machine */
+void TASM_Execute(struct TASM_Machine* M) {
+    int Idx;
+    for (Idx = 0; Idx < 0x2000; Idx++) { M->RAM[Idx] = 0; }
+    M->PC = 0x0000;
+    M->SP = 0xFF;
+    M->A = 0;
+    M->X = 0;
+    M->Y = 0;
+    M->P = 0;
+    
+    while (M->ROM[M->PC*4] != END) {
+        TASM_Eval(M);
+    }
+}
+
+/* executes a machine in debug mode */
+void TASM_Debug(struct TASM_Machine* M) {
     int Idx;
     int SubIdx;
-    clock_t Sleep;
+    for (Idx = 0; Idx < 0x2000; Idx++) { M->RAM[Idx] = 0; }
+    M->PC = 0x0000;
+    M->SP = 0xFF;
+    M->A = 0;
+    M->X = 0;
+    M->Y = 0;
+    M->P = 0;
 
-    /* prints information and delays execution by 0.1 seconds */
+    /* prints information and delays execution until key is pressed */
     while (M->ROM[M->PC*4] != END) {
         TASM_Eval(M);
         
-        if (PrintInfo) {
-            SubIdx = 0;
-            printf("\033[2J");
-            printf("--<TinyAssembly>--------------\n");
-            printf("(PC)$%04X, (SP)$%02X\n", M->PC, M->SP);
-            printf("(A)$%02X, (X)$%02X, (Y)$%02X\n", M->A, M->X, M->Y);
-            printf("(C)%d (N)%d (Z)%d\n", ((M->P & FLAG_C) != 0), ((M->P & FLAG_N) != 0), ((M->P & FLAG_Z) != 0));
-            printf("--<Memory>--------------------\n");
-            for (Idx = 0; Idx < 0x2000; Idx++) {
-                if (M->RAM[Idx] != 0) { printf("($%04X)$%02X ", Idx, M->RAM[Idx]); SubIdx++; }
-                if (SubIdx == 4) { putchar('\n'); SubIdx = 0; }
-            }
+        SubIdx = 0;
+        printf("\033[2J");
+        printf("--<TinyAssembly>--------------\n");
+        printf("(PC)$%04X (SP)$%02X\n", M->PC, M->SP);
+        printf("(A)$%02X (X)$%02X (Y)$%02X\n", M->A, M->X, M->Y);
+        printf("(C)%d (N)%d (Z)%d\n", ((M->P & FLAG_C) != 0), ((M->P & FLAG_N) != 0), ((M->P & FLAG_Z) != 0));
+        printf("--<Memory>--------------------\n");
+        for (Idx = 0; Idx < 0x2000; Idx++) {
+            if (M->RAM[Idx] != 0) { printf("($%04X)$%02X ", Idx, M->RAM[Idx]); SubIdx++; }
+            if (SubIdx == 4) { putchar('\n'); SubIdx = 0; }
         }
-        if (DelayExec) {
-            Sleep = clock();
-            while (clock() < Sleep + (CLOCKS_PER_SEC/10)) {}
-        }
+        
+        getchar();
     }
-    
-    free(M->RAM);
-    free(M->ROM);
-}
-
-int main(int ArgC, char* ArgV[]) {
-    struct TASM_Machine* M;
-    if (!ArgV[1]) { printf("--<File missing!>--\n"); exit(1); }
-
-    M = TASM_Start(ArgV[1]);
-    TASM_Execute(M, 1, 1);
-
-    free(M);
-    return 0;
 }
