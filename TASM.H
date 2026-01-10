@@ -44,6 +44,7 @@ struct TASM_Machine {
     unsigned char P;                                   /* flags */
 };
 
+typedef struct TASM_Machine TASM_Machine;
 void* TASM_Open(char* F);
 void TASM_Close(struct TASM_Machine* M);
 void TASM_Execute(struct TASM_Machine* M);
