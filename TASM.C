@@ -211,7 +211,7 @@ void TASM_Eval(struct TASM_Machine* M) {
         M->SP++;
         M->PC = M->RAM[0x100 + M->SP];
         M->SP++;
-        M->PC = (M->PC << 8) | M->RAM[0x100 + M->SP];
+        M->PC = M->PC | (M->RAM[0x100 + M->SP] << 8);
         break;
     }
     
