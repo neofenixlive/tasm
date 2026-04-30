@@ -7,7 +7,7 @@ No labels, branches and jumps uses line positions
 No overflow, arithmetic uses from 0 to 255
 
 Memory ranges from $0000 to $1FFF
-Instructions are limited to 4096 per program
+Instructions are limited to 32768 per program
 C, Z and N flags are available
 
 ---<Library>---
