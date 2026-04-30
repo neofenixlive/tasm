@@ -1,6 +1,6 @@
 #include "tasm.h"
 
-/* parses string into token */
+/* string to instruction */
 void* TASM_Parser(char* S) {
     unsigned int* T = calloc(4, sizeof(int));
     int Idx = 0;
@@ -64,7 +64,7 @@ void* TASM_Parser(char* S) {
     if (T[1] == IMP) { free(Line); return T; }
     Idx = 3;
     
-    /* writes data from string */
+    /* checks operands */
     if (Line[Idx] == '#') { T[1] = IMM; Idx++; }
     else { T[1] = ABS; }
     if (Line[Idx] == '$') { IsHex = 1; Idx++; }
@@ -103,8 +103,8 @@ void* TASM_Parser(char* S) {
     return T;
 }
 
-/* evaluates current token */
-void TASM_Evaluator(struct TASM_Machine* M) {
+/* evaluates current instruction */
+void TASM_Evaluate(struct TASM_Machine* M) {
     unsigned int Value = (M->ROM[M->PC*4+3] << 8) | M->ROM[M->PC*4+2];
     unsigned char* Data = NULL;
     int LastC = M->P & FLAG_C;
@@ -115,7 +115,7 @@ void TASM_Evaluator(struct TASM_Machine* M) {
     else if (M->ROM[M->PC*4+1] == IDX) { Data = &M->RAM[Value + M->X]; }
     else if (M->ROM[M->PC*4+1] == IDY) { Data = &M->RAM[Value + M->Y]; }
 
-    /* operation execution */
+    /* instruction execution */
     switch (M->ROM[M->PC*4]) {
     default: break;
     case LDA: M->A = *Data; break;
