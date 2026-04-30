@@ -45,9 +45,10 @@ struct TASM_Machine {
 };
 
 typedef struct TASM_Machine TASM_Machine;
-void* TASM_Open(char* F);
-void TASM_Close(struct TASM_Machine* M);
-void TASM_Execute(struct TASM_Machine* M);
-void TASM_Debug(struct TASM_Machine* M);
+void* TASM_Open(char*);
+void TASM_Close(struct TASM_Machine*);
+void TASM_Wipe(struct TASM_Machine*);
+void TASM_Execute(struct TASM_Machine*);
+void TASM_Debug(struct TASM_Machine*);
 
 #endif
