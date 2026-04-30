@@ -14,6 +14,7 @@ C, Z and N flags are available
 TASM_Machine: Struct that contains ROM, RAM, registers and flags
 TASM_Open(char* File): Returns new TASM_Machine*
 TASM_Close(TASM_Machine* M): Deletes machine and memory allocations
+TASM_Wipe(TASM_Machine* M): Clears machine RAM, registers and flags
 TASM_Execute(TASM_Machine* M): Executes machine
 TASM_Debug(TASM_Machine* M): Executes machine, printing information and delaying with ENTER
 
