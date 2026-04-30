@@ -10,22 +10,11 @@ void* TASM_Parser(char* S) {
     int SaveAs16 = 0;
     
     char* Line = NULL;
-    void* Temp = NULL;
 
     /* removes whitespace and ignores comments */
     for (Idx = 0; S[Idx] != '\0'; Idx++) {
         if (S[Idx] == ' ' || S[Idx] == '\t' || S[Idx] == '\n') { continue; }
         if (S[Idx] == ';') { break; }
-
-        Temp = realloc(Line, sizeof(char) * (SubIdx + 2));
-        if (Temp == NULL) {
-            free(Line);
-            free(T);
-            printf("--<Instruction parser failed!>--\n");
-            exit(1);
-        }
-        Line = Temp;
-
         Line[SubIdx] = S[Idx];
         Line[SubIdx + 1] = '\0';
         SubIdx++;
@@ -228,10 +217,10 @@ void* TASM_Open(char* F) {
     FILE* Program = fopen(F, "r");
     int Idx;
     
-    if (!Program) { printf("--<File missing!>--\n"); exit(1); }
+    if (!Program) { printf("File failed to open or read.\n"); exit(1); }
 
     /* setup new machine */
-    M->ROM = calloc(0x4000, sizeof(char));
+    M->ROM = calloc(0x8000, sizeof(char));
     M->RAM = calloc(0x2000, sizeof(char));
     
     /* write operations */
@@ -290,12 +279,12 @@ void TASM_Debug(struct TASM_Machine* M) {
         TASM_Eval(M);
         
         SubIdx = 0;
-        printf("\033[2J");
-        printf("--<TinyAssembly>--------------\n");
+        printf("\033[2J" "TinyAssembly\n");
+        printf("Registers & flags:\n");
         printf("(PC)$%04X (SP)$%02X\n", M->PC, M->SP);
         printf("(A)$%02X (X)$%02X (Y)$%02X\n", M->A, M->X, M->Y);
         printf("(C)%d (N)%d (Z)%d\n", ((M->P & FLAG_C) != 0), ((M->P & FLAG_N) != 0), ((M->P & FLAG_Z) != 0));
-        printf("--<Memory>--------------------\n");
+        printf("Memory:\n");
         for (Idx = 0; Idx < 0x2000; Idx++) {
             if (M->RAM[Idx] != 0) { printf("($%04X)$%02X ", Idx, M->RAM[Idx]); SubIdx++; }
             if (SubIdx == 4) { putchar('\n'); SubIdx = 0; }
