@@ -8,7 +8,7 @@ void* TASM_Parser(char* S) {
     int IsHex = 0;
     int IsBin = 0;
     int SaveAs16 = 0;
-    char* Line = NULL;
+    char* Line = malloc(sizeof(char) * 256);
 
     /* removes whitespace and ignores comments */
     for (Idx = 0; S[Idx] != '\0'; Idx++) {
@@ -213,7 +213,7 @@ void TASM_Evaluate(struct TASM_Machine* M) {
 /* starts a machine */
 void* TASM_Open(char* F) {
     struct TASM_Machine* M = malloc(sizeof(struct TASM_Machine));
-    char* Instruction = malloc(sizeof(char) * 128);
+    char* Instruction = malloc(sizeof(char) * 256);
     FILE* Program = fopen(F, "r");
     int Idx;
     
@@ -230,7 +230,7 @@ void* TASM_Open(char* F) {
     M->P = 0;
     
     /* write instructions */
-    for (Idx = 0; fgets(Instruction, 128, Program); Idx += 4) {
+    for (Idx = 0; fgets(Instruction, 256, Program); Idx += 4) {
         unsigned int* T = TASM_Parser(Instruction);
         M->ROM[Idx] = (char)T[0];
         M->ROM[Idx+1] = (char)T[1];
