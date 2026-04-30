@@ -230,7 +230,7 @@ void* TASM_Open(char* F) {
     M->Y = 0;
     M->P = 0;
     
-    /* write operations */
+    /* write instructions */
     for (Idx = 0; fgets(Instruction, 128, Program); Idx += 4) {
         unsigned int* T = TASM_Parser(Instruction);
         M->ROM[Idx] = (char)T[0];
