@@ -63,7 +63,7 @@ void* TASM_Parser(char* S) {
     if (T[1] == IMP) { free(Line); return T; }
     Idx = 3;
     
-    /* checks operands */
+    /* checks operand */
     if (Line[Idx] == '#') { T[1] = IMM; Idx++; }
     else { T[1] = ABS; }
     if (Line[Idx] == '$') { IsHex = 1; Idx++; }
