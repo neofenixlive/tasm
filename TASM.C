@@ -8,7 +8,6 @@ void* TASM_Parser(char* S) {
     int IsHex = 0;
     int IsBin = 0;
     int SaveAs16 = 0;
-    
     char* Line = NULL;
 
     /* removes whitespace and ignores comments */
