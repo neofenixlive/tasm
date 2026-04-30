@@ -59,7 +59,7 @@ void* TASM_Parser(char* S) {
     else if (TASM_CheckOpr(Line, "JSR")) { T[0] = JSR; SaveAs16 = 1; }
     else if (TASM_CheckOpr(Line, "RTS")) { T[0] = RTS; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "END")) { T[0] = END; T[1] = IMP; }
-    else { printf("Invalid instruction found.\n"); exit(1); }
+    else { printf("Invalid operation found.\n"); exit(1); }
 
     if (T[1] == IMP) { free(Line); return T; }
     Idx = 3;
@@ -104,7 +104,7 @@ void* TASM_Parser(char* S) {
 }
 
 /* evaluates current token */
-void TASM_Eval(struct TASM_Machine* M) {
+void TASM_Evaluator(struct TASM_Machine* M) {
     unsigned int Value = (M->ROM[M->PC*4+3] << 8) | M->ROM[M->PC*4+2];
     unsigned char* Data = NULL;
     int LastC = M->P & FLAG_C;
@@ -218,11 +218,17 @@ void* TASM_Open(char* F) {
     FILE* Program = fopen(F, "r");
     int Idx;
     
-    if (!Program) { printf("File failed to open or read.\n"); exit(1); }
+    if (!Program) { printf("File not found.\n"); exit(1); }
 
     /* setup new machine */
     M->ROM = calloc(0x8000, sizeof(char));
     M->RAM = calloc(0x2000, sizeof(char));
+    M->PC = 0x0000;
+    M->SP = 0xFF;
+    M->A = 0;
+    M->X = 0;
+    M->Y = 0;
+    M->P = 0;
     
     /* write operations */
     for (Idx = 0; fgets(Instruction, 128, Program); Idx += 4) {
@@ -247,45 +253,42 @@ void TASM_Close(struct TASM_Machine* M) {
     free(M);
 }
 
-/* executes a machine */
-void TASM_Execute(struct TASM_Machine* M) {
+/* clears a machine */
+void TASM_Wipe(struct TASM_Machine* M) {
     int Idx;
     for (Idx = 0; Idx < 0x2000; Idx++) { M->RAM[Idx] = 0; }
-    M->PC = 0x0000;
     M->SP = 0xFF;
     M->A = 0;
     M->X = 0;
     M->Y = 0;
     M->P = 0;
-    
+}
+
+/* executes a machine */
+void TASM_Execute(struct TASM_Machine* M) {
+    M->PC = 0x0000;
     while (M->ROM[M->PC*4] != END) {
-        TASM_Eval(M);
+        TASM_Evaluate(M);
     }
 }
 
 /* executes a machine in debug mode */
 void TASM_Debug(struct TASM_Machine* M) {
-    int Idx;
-    int SubIdx;
-    for (Idx = 0; Idx < 0x2000; Idx++) { M->RAM[Idx] = 0; }
+    int Idx = 0;
+    int SubIdx = 0;
     M->PC = 0x0000;
-    M->SP = 0xFF;
-    M->A = 0;
-    M->X = 0;
-    M->Y = 0;
-    M->P = 0;
-
+    
     /* prints information and delays execution until key is pressed */
     while (M->ROM[M->PC*4] != END) {
-        TASM_Eval(M);
+        TASM_Evaluate(M);
         
-        SubIdx = 0;
         printf("\033[2J" "TinyAssembly\n");
         printf("Registers & flags:\n");
         printf("(PC)$%04X (SP)$%02X\n", M->PC, M->SP);
         printf("(A)$%02X (X)$%02X (Y)$%02X\n", M->A, M->X, M->Y);
         printf("(C)%d (N)%d (Z)%d\n", ((M->P & FLAG_C) != 0), ((M->P & FLAG_N) != 0), ((M->P & FLAG_Z) != 0));
         printf("Memory:\n");
+        SubIdx = 0;
         for (Idx = 0; Idx < 0x2000; Idx++) {
             if (M->RAM[Idx] != 0) { printf("($%04X)$%02X ", Idx, M->RAM[Idx]); SubIdx++; }
             if (SubIdx == 4) { putchar('\n'); SubIdx = 0; }
