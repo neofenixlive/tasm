@@ -59,6 +59,7 @@ void* TASM_Parser(char* S) {
     else if (TASM_CheckOpr(Line, "JSR")) { T[0] = JSR; SaveAs16 = 1; }
     else if (TASM_CheckOpr(Line, "RTS")) { T[0] = RTS; T[1] = IMP; }
     else if (TASM_CheckOpr(Line, "END")) { T[0] = END; T[1] = IMP; }
+    else { printf("Invalid instruction found.\n"); exit(1); }
 
     if (T[1] == IMP) { free(Line); return T; }
     Idx = 3;
