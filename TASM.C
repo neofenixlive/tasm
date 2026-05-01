@@ -256,6 +256,7 @@ void TASM_Close(struct TASM_Machine* M) {
 void TASM_Wipe(struct TASM_Machine* M) {
     int Idx;
     for (Idx = 0; Idx < 0x2000; Idx++) { M->RAM[Idx] = 0; }
+    M->PC = 0x0000;
     M->SP = 0xFF;
     M->A = 0;
     M->X = 0;
