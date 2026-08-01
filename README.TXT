@@ -18,8 +18,8 @@ TASM_Wipe(TASM_Machine* M): Clears machine RAM, registers and flags
 TASM_Execute(TASM_Machine* M): Executes machine
 TASM_Debug(TASM_Machine* M): Executes machine, printing information and delaying with ENTER
 
-_RUN.C: Standalone executable, uses debug mode
-_DEMO.ASM: Testing program, fibonacci equation
+MAIN.C: Standalone executable, uses debug mode
+DEMO.ASM: Testing program, fibonacci sequence
 
 ---<Address modes>---
 "OPR" Implied
