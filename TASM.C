@@ -1,7 +1,7 @@
 #include "tasm.h"
 
 /* string to instruction */
-void* TASM_Parser(char* S) {
+void* TASM_Compile(char* S) {
     unsigned int* T = calloc(4, sizeof(int));
     int Idx = 0;
     int SubIdx = 0;
@@ -103,7 +103,7 @@ void* TASM_Parser(char* S) {
 }
 
 /* evaluates current instruction */
-void TASM_Evaluate(struct TASM_Machine* M) {
+void TASM_Execute(struct TASM_Machine* M) {
     unsigned int Value = (M->ROM[M->PC*4+3] << 8) | M->ROM[M->PC*4+2];
     unsigned char* Data = NULL;
     int LastC = M->P & FLAG_C;
@@ -208,8 +208,6 @@ void TASM_Evaluate(struct TASM_Machine* M) {
     M->PC &= 0xFFFF;
 }
 
-
-
 /* starts a machine */
 void* TASM_Open(char* F) {
     struct TASM_Machine* M = malloc(sizeof(struct TASM_Machine));
@@ -231,7 +229,7 @@ void* TASM_Open(char* F) {
     
     /* write instructions */
     for (Idx = 0; fgets(Instruction, 256, Program); Idx += 4) {
-        unsigned int* T = TASM_Parser(Instruction);
+        unsigned int* T = TASM_Compile(Instruction);
         M->ROM[Idx] = (char)T[0];
         M->ROM[Idx+1] = (char)T[1];
         M->ROM[Idx+2] = (char)T[2];
@@ -268,7 +266,7 @@ void TASM_Wipe(struct TASM_Machine* M) {
 void TASM_Execute(struct TASM_Machine* M) {
     M->PC = 0x0000;
     while (M->ROM[M->PC*4] != END) {
-        TASM_Evaluate(M);
+        TASM_Execute(M);
     }
 }
 
@@ -280,7 +278,7 @@ void TASM_Debug(struct TASM_Machine* M) {
     
     /* prints information and delays execution until key is pressed */
     while (M->ROM[M->PC*4] != END) {
-        TASM_Evaluate(M);
+        TASM_Execute(M);
         
         printf("\033[2J" "TinyAssembly\n");
         printf("Registers & flags:\n");
