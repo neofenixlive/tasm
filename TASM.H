@@ -1,5 +1,5 @@
-#ifndef __TINYASSEMBLY
-#define __TINYASSEMBLY
+#ifndef _TINYASSEMBLY
+#define _TINYASSEMBLY
 
 #include <stdio.h>
 #include <stdlib.h>
